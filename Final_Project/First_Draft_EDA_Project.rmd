@@ -1,0 +1,374 @@
+---
+title: "EDA_Project_Explore_and_Summarize_Data"
+output: html_document
+
+Exploratory Data Analysis (EDA) is the numerical and graphical examination of data characteristics and relationships before formal, rigorous statistical analyses are applied.
+
+EDA can lead to insights, which may uncover to other questions, and eventually predictive models. It also is an important “line of defense” against bad data and is an opportunity to notice that your assumptions or intuitions about a data set are violated.
+
+When working on this project, think about the insights you're trying to provide.
+
+The following will hide code and warning from the output of HTML.
+{r echo=FALSE, message=FALSE, warning=FALSE}
+---
+
+template: http://video.udacity-data.com.s3.amazonaws.com/topher/2017/February/58af99ac_projecttemplate/projecttemplate.rmd
+
+rubric: https://review.udacity.com/#!/rubrics/26/view
+
+A stream-of-consciousness analysis and exploration of the data.
+
+a. Headings and text should organize your thoughts and reflect your analysis as you explored the data.
+
+b. Plots in this analysis do not need to be polished with labels, units, and titles; these plots are exploratory (quick and dirty). They should, however, be of the appropriate type and effectively convey the information you glean from them.
+
+c. You can iterate on a plot in the same R chunk, but you don’t need to show every plot iteration in your analysis.
+
+A section at the end called “Final Plots and Summary”
+
+You will select three plots from your analysis to polish and share in this section. The three plots should show different trends and should be polished with appropriate labels, units, and titles (see the Project Rubric for more information).
+
+A final section called “Reflection”
+
+This should contain a few sentences about your struggles, successes, and ideas for future exploration on the data set (see the Project Rubric for more information).
+
+```{R}
+library(ggplot2)
+setwd("/Users/markmeleka/Documents/Comp\ Sci\ and\ Programming\ Learning/Udacity/DAND/Exploratory_Data_Analysis/eda-course-materials/final_project/")
+
+loanData <- read.csv('prosperLoanData.csv')
+
+#variable definitions: https://docs.google.com/spreadsheets/d/1gDyi_L4UvIrLTEC6Wri5nbaMmkGmLQBk-Yx3z0XDEtI/edit?usp=sharing
+
+head(loanData)
+```
+
+The effect of occupation on loans
+-Occupation vs. LoanOriginalAmount
+-Occupation and EmploymentStatus vs. LoanOriginalAmount
+-Occupation vs. CreditGrade
+-Occupation vs. ProsperScore
+-Occupation vs. IncomeRange
+-Occupation vs. IncomeRange and IncomeVerifiable
+
+Does Occupation matter, or is it only StatedMonthlyIncome that matters?
+StatedMonthlyIncome vs. LoanOriginalAmount
+StatedMonthlyIncome and EmploymentStatus vs. LoanOriginalAmount
+StatedMonthlyIncome vs. CreditGrade
+StatedMonthlyIncome vs. ProsperScore
+
+IsBorrowerHomeowner
+
+CreditGrade vs. ProsperScore
+CreditGrade and ProsperScore vs:
+CurrentCreditLines
+OpenCreditLines
+(What's the difference between current and open credit lines)
+TotalCreditLinespast7years
+InquiriesLast6Months
+DelinquenciesLast7Years
+
+
+Interesting variables:
+CreditGrade
+Term
+LoanStatus
+BorrowerAPR
+BorrowerRate
+ProsperScore
+ListingCategory
+BorrowerState
+Occupation
+EmploymentStatus
+EmploymentStatusDuration
+IsBorrowerHomeowner
+CurrentCreditLines
+OpenCreditLines
+TotalCreditLinespast7years
+InquiriesLast6Months
+DelinquenciesLast7Years
+DebtToIncomeRatio
+IncomeRange
+IncomeVerifiable
+StatedMonthlyIncome
+ScorexChangeAtTimeOfListing
+LoanCurrentDaysDelinquent
+LoanOriginalAmount
+LoanOriginationQuarter
+MonthlyLoanPayment
+PercentFunded
+InvestmentFromFriendsCount
+InvestmentFromFriendsAmount
+Investors
+
+``` {R}
+unique(loanData['Occupation'])
+```
+There are 68 unique occupations.
+
+``` {R}
+CreditScoreAverage <- (loanData['CreditScoreRangeLower'] + loanData['CreditScoreRangeUpper'])/2
+```
+
+The goal of this exploration is to get an idea of what changeable factors affect a) securing a loan b) loan rates. Changable factors include occupation, incomerange, creditscore, opencreditlines, inquiries, and delinquincies.
+
+Let's start by looking at incomerange by occupation.
+
+First, let's see how many StatedMonthlyIncome data points are verifiable (ie. IncomeVerifiable = 'True')
+
+```{R}
+summary(loanData['IncomeVerifiable'])
+```
+
+Less than 10% are not verifiable. Let's only focus on the verifiable incomes.
+
+```{R StatedMonthlyIncome by Occupation}
+ggplot(subset(loanData, IncomeVerifiable = 'True'), 
+       aes(x= reorder(Occupation, StatedMonthlyIncome, FUN=median), 
+           y=StatedMonthlyIncome)) +
+  geom_boxplot() + 
+  coord_flip(ylim= c(0,30000))
+```
+
+```{R}
+summary(loanData$Occupation)
+```
+
+
+Now let's explore StatedMonthlyIncome vs. LoanOriginalAmount
+```{R}
+ggplot(loanData, aes(x=StatedMonthlyIncome, y=LoanOriginalAmount)) + 
+  geom_jitter(alpha = 0.1) + 
+  geom_smooth() +
+  coord_cartesian(xlim = c(0,30000), ylim = c(0,max(loanData$LoanOriginalAmount)))
+```
+
+Let's subset by creditgrade. We're only going to plot data points with stated creditratings.
+```{R}
+library(RColorBrewer)
+
+loanData$CreditGrade <- ordered(loanData$CreditGrade, levels=c('AA', 'A', 'B', 'C', 'D', 'E', 'HR', 'NC', ''))
+
+ggplot(subset(loanData, CreditGrade != ''), aes(x=StatedMonthlyIncome, 
+                     y=LoanOriginalAmount, 
+                     color=CreditGrade)) + 
+  scale_color_brewer() +
+  geom_jitter(alpha = 0.3) + 
+  geom_smooth() +
+  coord_cartesian(xlim = c(0,30000), 
+                  ylim = c(0,max(loanData$LoanOriginalAmount)))
+```
+
+Analysing by Loan Status
+http://help.bitbond.com/article/20-the-10-loan-status-variants-explained
+```{R}
+LoanStatusGeneral <- loanData$LoanStatus
+levels(LoanStatusGeneral) <- c(levels(LoanStatusGeneral), 'PastDue')
+past_due_rows <- grep('^Past', LoanStatusGeneral)
+LoanStatusGeneral[past_due_rows] <- 'PastDue'
+LoanStatusGeneral <- ordered(LoanStatusGeneral, levels=c("Completed", "FinalPaymentInProgress", "Current", "PastDue", "Defaulted", "Chargedoff", "Cancelled"))
+loanData$LoanStatusGeneral <- LoanStatusGeneral
+
+ggplot(loanData, aes(x=StatedMonthlyIncome, 
+                     y=LoanOriginalAmount, 
+                     color=LoanStatusGeneral)) + 
+  geom_jitter(alpha = 0.1) + 
+  scale_color_brewer(type = 'div',
+                     guide = guide_legend(title = 'Loan Status',
+                                          override.aes = list(alpha = 1, size = 2)),
+                     direction = -1) +
+  #geom_smooth() +
+  coord_cartesian(xlim = c(0,30000), 
+                  ylim = c(0,max(loanData$LoanOriginalAmount)))
+```
+
+Here we see many 'completed' loans where the LoanOriginalAmount is also low. Defaulted and ChargedOff loans seem to occur when the StatedMonthlyIncome is low and the LoanOriginalAmount is high.
+
+```{R}
+loanData$EmploymentStatus <- ordered(loanData$EmploymentStatus, levels=c("Employed", "Full-time", "Part-time", "Self-employed", "Retired", "Not employed", "Not available", "Other", ""))
+summary(loanData$EmploymentStatus)
+
+ggplot(subset(loanData, EmploymentStatus != ''), 
+       aes(x=StatedMonthlyIncome,
+           y=LoanOriginalAmount,
+           color=EmploymentStatus)) + 
+  geom_jitter(alpha = 0.1) + 
+  scale_color_brewer(type = 'div',
+                     guide = guide_legend(title = 'Employment Status',
+                                          override.aes = list(alpha = 1, size = 2)),
+                     direction = -1) +
+  #geom_smooth() +
+  coord_cartesian(xlim = c(0,30000), 
+                  ylim = c(0,max(loanData$LoanOriginalAmount)))
+```
+
+```{R EmploymentStatus vs. LoanStatus}
+ggplot(subset(loanData, EmploymentStatus != ''), 
+       aes(x=EmploymentStatus,
+           y=LoanStatusGeneral)) + 
+  geom_jitter(alpha = 0.1) + 
+  facet_wrap(~ListingYear)
+```
+
+```{R StatedMonthlyIncome vs. CreditScore}
+loanData$CreditScoreAverage <- (loanData$CreditScoreRangeLower +
+                                  loanData$CreditScoreRangeUpper) /2
+loanData[,c('CreditScoreRangeLower', 'CreditScoreRangeUpper', 'CreditScoreAverage')]
+
+ggplot(loanData, 
+       aes(x=StatedMonthlyIncome,
+           y=CreditScoreAverage)) + 
+  geom_jitter(alpha = 0.1) + 
+  geom_smooth() +
+  coord_cartesian(xlim = c(0,30000))
+```
+
+```{R IncomeRange vs. CreditScore}
+levels(loanData$IncomeRange)
+loanData$IncomeRange <- ordered(loanData$IncomeRange, levels=c("Not displayed", "Not employed", "$0", "$1-24,999",  "$25,000-49,999", "$50,000-74,999", "$75,000-99,999", "$100,000+"))
+
+ggplot(subset(loanData, IncomeVerifiable = 'True'), 
+       aes(x=IncomeRange,
+           y=CreditScoreAverage)) + 
+  geom_boxplot()
+```
+
+```{R IncomeRange vs. CreditScore facet by IsBorrowerHomeowner}
+#I don't love this plot
+summary(loanData$IsBorrowerHomeowner)
+
+ggplot(subset(loanData, IncomeVerifiable = 'True'), 
+       aes(x=IsBorrowerHomeowner,
+           y=CreditScoreAverage,
+           fill=IsBorrowerHomeowner)) + 
+  geom_boxplot() + 
+  facet_wrap(~IncomeRange)
+
+```
+
+If I own a home, a) can I get more money? b) Are my interest rates lower? All else the same.
+
+```{R}
+ggplot(loanData,
+       aes(x= CreditScoreAverage,
+           y=BorrowerRate)) + 
+  geom_jitter(alpha=0.1, aes(color = LoanOriginalAmount)) + 
+  scale_colour_gradientn(colours=rainbow(4)) +
+  geom_smooth() + 
+  coord_cartesian(xlim=c(500,850)) + 
+  facet_wrap(~ListingYear)
+```
+
+```{R}
+summary(loanData$ProsperScore)
+
+ProsperScore_plot <- ggplot(subset(loanData, IncomeVerifiable = 'True'), 
+                       aes(x=IncomeRange,
+                           y=ProsperScore)) + 
+  geom_boxplot()
+
+CreditScore_plot <- ggplot(subset(loanData, IncomeVerifiable = 'True'), 
+                       aes(x=IncomeRange,
+                           y=CreditScoreAverage)) + 
+  geom_boxplot() + 
+  coord_cartesian(ylim= c(300,850))
+
+grid.arrange(ProsperScore_plot, CreditScore_plot)
+#This is a poor comparison because ProsperScore and CreditScore are on different scales. We should normalize the variables somehow and put them side by side.
+```
+
+```{R}
+summary(loanData$BorrowerRate)
+
+loanData$ListingYear <- substring(loanData$ListingCreationDate,1,4)
+loanData$ListingYear <- ordered(ListingYear)
+summary(loanData$ListingYear)
+
+qplot(loanData$ListingYear)
+#Here we see a dip in loans in 2009, right after the 2008 financial crisis. We also see a sharp rise in loans in 2013 after the economy's picked back up and Prosper raises their bar for credit scores. 2014 shows a significant drop in loans. This could be because we have incomplete data. If we needed to confirm, we could analyze by loan month.
+
+ggplot(subset(loanData, ListingYear != 2005),
+       aes(x=CreditScoreAverage,
+           y=BorrowerRate
+           #color = IncomeRange
+           )) + 
+  #scale_color_brewer(type= 'seq', direction = 1) +
+  geom_jitter(alpha= 0.1) + 
+  geom_smooth() +
+  coord_cartesian(xlim=c(400,850)) +
+  facet_wrap(~ListingYear)
+```
+
+First, we confirm a highly known hypothesis: the higher your credit score, the lower your interest rate.
+
+Next we see that as the years passed, Prosper raised their minimum bar for an AverageCreditScore. They accepted CreditScores of about 450 in 2006. In 2011 they didn't accept anything under 500. In 2012 nothing under 600. And finally, in 2014, nothing under 630. 
+
+```{R}
+qplot(loanData$OpenCreditLines)
+qplot(loanData$TotalInquiries, xlim=c(0,75))
+qplot(loanData$DebtToIncomeRatio, xlim=c(0,2))
+```
+
+```{R}
+ggplot(loanData,
+       aes(x=OpenCreditLines,
+           y=DebtToIncomeRatio)) + 
+  geom_jitter(alpha=1/10)
+```
+```{R}
+ggplot(loanData,
+       aes(x=TotalInquiries,
+           y=DebtToIncomeRatio)) + 
+  geom_jitter(alpha=1/10) + 
+  coord_cartesian(xlim=c(0,130))
+```
+
+```{R}
+unique(loanData$InvestmentFromFriendsCount)
+
+ggplot(subset(loanData, InvestmentFromFriendsAmount/LoanOriginalAmount < 1),
+       aes(x=InvestmentFromFriendsCount,
+           y=LoanStatusGeneral
+           #color= InvestmentFromFriendsAmount/LoanOriginalAmount
+           #color = IncomeRange
+           )) + 
+#  scale_color_brewer(type='seq',
+#                     guide = guide_legend(title = 'Income Range', 
+#                                          override.aes = list(alpha = 1, 
+#                                                              size = 2))) +                       
+  geom_raster(aes(fill=InvestmentFromFriendsAmount/LoanOriginalAmount)) + 
+  scale_fill_gradientn(colours=rainbow(2)) +
+  coord_cartesian(xlim=c(0,10))
+```
+```{R}
+ggplot(subset(loanData, InvestmentFromFriendsAmount/LoanOriginalAmount < .3),
+       aes(x=InvestmentFromFriendsCount,
+           y=LoanStatusGeneral,
+           color= InvestmentFromFriendsAmount/LoanOriginalAmount
+           #color = IncomeRange
+           )) + 
+#  scale_color_brewer(type='seq',
+#                     guide = guide_legend(title = 'Income Range', 
+#                                          override.aes = list(alpha = 1, 
+#                                                              size = 2))) +                       
+  geom_jitter() + 
+  coord_cartesian(xlim=c(0,10))
+```
+
+```{R}
+ggplot(loanData,
+       aes(x=as.Date(LoanOriginationDate),
+           y=LP_InterestandFees)) + 
+  geom_jitter(alpha=0.1) + 
+  geom_smooth() +
+  scale_x_date(labels = date_format("%Y-%m"),
+               date_breaks = "1 year")
+```
+
+```{R}
+ggplot(loanData,
+       aes(x=ListingYear,
+           y=LP_InterestandFees)) + 
+  stat_summary(fun.y = sum,
+               geom = "bar")
+```
